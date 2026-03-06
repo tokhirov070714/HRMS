@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  ON_LEAVE
+  TERMINATED
+  RETIRED
+}
+
+enum UserRole {
+  ADMIN
+  EMPLOYEE
+  SCHOOL_HEAD
+}
+
+enum EmployeeType {
+  ACADEMIC
+  ADMINISTRATIVE_STAFF
+}
+
+enum AcademicPosition {
+  LECTURER
+  ASSISTANT_PROFESSOR
+  ASSOCIATE_PROFESSOR
+  PROFESSOR
+}
+
+enum AdministrativePosition {
+  TECHNICIAN
+  CLEANER
+  RECRUITER
+  RECEPTIONIST
+}
+
+// =============================================
+// ORGANIZATIONAL STRUCTURE
+// =============================================
+
+model School {
+  id          String   @id @default(uuid())
+  schoolName  String   @db.VarChar(100)
+  description String?  @db.Text
+  icon        String?  @db.VarChar(100)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  departments Department[]
+  schoolHead  School_Head?
+  users       User[]
+}
+
+model Department {
+  id             String   @id @default(uuid())
+  departmentName String   @db.VarChar(100)
+  description    String?  @db.Text
+  icon           String?  @db.VarChar(100)
+  schoolId       String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  users  User[]
+}
+
+model School_Head {
+  id         String   @id @default(uuid())
+  userId     String   @unique // one user can only head one school
+  schoolId   String?  @unique // one school can only have one head
+  assignedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school School? @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+}
+
+// =============================================
+// USER (Combined User + Employee)
+// =============================================
+
+model User {
+  id String @id @default(uuid())
+
+  // Authentication
+  username     String   @unique @db.VarChar(50)
+  passwordHash String   @db.VarChar(255)
+  role         UserRole @default(EMPLOYEE)
+  isActive     Boolean  @default(true)
+
+  // Personal Information
+  firstName String @db.VarChar(50)
+  lastName  String @db.VarChar(50)
+  email     String @unique @db.VarChar(100)
+
+  // Contact Information - Local
+  phoneLocal   String? @db.VarChar(20)
+  addressLocal String? @db.VarChar(200)
+  city         String? @db.VarChar(100)
+  country      String? @db.VarChar(100)
+
+  // Contact Information - Foreign (for international employees)
+  phoneForeign   String? @db.VarChar(20)
+  addressForeign String? @db.VarChar(200)
+  cityForeign    String? @db.VarChar(100)
+  countryForeign String? @db.VarChar(100)
+
+  dateOfBirth DateTime? @db.Date
+  isLocal     Boolean   @default(false)
+
+  // Employment Information
+  employeeType           EmployeeType
+  academicPosition       AcademicPosition? // Only set if employeeType is ACADEMIC
+  administrativePosition AdministrativePosition? // Only set if employeeType is ADMINISTRATIVE_STAFF
+  status                 EmployeeStatus          @default(ACTIVE)
+  departmentId           String?
+  schoolId               String?
+  baseSalary             Decimal?                @db.Decimal(12, 2)
+
+  // Profile
+  bio               String? @db.Text
+  profilePictureUrl String? @db.VarChar(500)
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  school            School?            @relation(fields: [schoolId], references: [id])
+  department        Department?        @relation(fields: [departmentId], references: [id])
+  emergencyContacts EmergencyContact[]
+  todos             Todo[]
+  schoolHead        School_Head?
+
+  @@index([departmentId])
+  @@index([email])
+  @@index([username])
+}
+
+model EmergencyContact {
+  id           String  @id @default(uuid())
+  userId       String
+  contactName  String  @db.VarChar(100)
+  relationship String? @db.VarChar(50)
+  phonePrimary String  @db.VarChar(20)
+  email        String? @db.VarChar(100)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// =============================================
+// EMPLOYEE SELF-SERVICE
+// =============================================
+
+model Todo {
+  id          String    @id @default(uuid())
+  userId      String
+  title       String    @db.VarChar(200)
+  description String?   @db.Text
+  status      String    @default("Pending") @db.VarChar(30)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Event {
+  id          String   @id @default(cuid())
+  title       String
+  location    String?
+  startTime   DateTime
+  description String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

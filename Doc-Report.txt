@@ -1,0 +1,29 @@
+Feb 7 (Saturday) - 
+    Created a sample database schema. 
+    Created a registration page (background need to be changed)
+    Created the following APIs with base /api/auth : 
+        /register, /login, /logout, /me, /verifyusername
+
+Feb 8 (Sunday) -
+    Configured a video backround for register and login pages
+    Created login page
+
+Feb 10 (Tuesday) -
+    Started working on admin dashboard
+    Created api/admin
+    Created getDashboardData function for api/admin
+    Created a calendar in admin dashboard
+
+Feb 11 (Wednesday) -
+    Created sub-blocks Total Payroll and Average Salary
+    Finished dashboard, but still need to add links to other pages
+
+fixes: remove payroll and avg salary and add instead the following: number of employees (local and international)
+and number of departments
+
+
+Types of employees:
+    ADMIN - Workers like: cleaners, technitians, ect
+    ACADEMIC - Lecturer, Assistant Professor, Associate Professor, Professor
+
+phone numbers and addresses must be two types: LOCAL and FOREIGN
