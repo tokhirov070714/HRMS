@@ -5,15 +5,19 @@ import { useRouter } from "next/navigation";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DateCalendar } from "@mui/x-date-pickers/DateCalendar";
+import { PickersDay, PickersDayProps } from "@mui/x-date-pickers/PickersDay";
+import { Badge } from "@mui/material";
 import dayjs, { Dayjs } from "dayjs";
 import {
     FaUniversity,
     FaMapMarkerAlt,
     FaCheckCircle,
     FaCalendarAlt,
+    FaTimes,
 } from "react-icons/fa";
 import { FiMail, FiUser } from "react-icons/fi";
 import useSession from "@/hooks/useSession";
+import EmployeeDashboardSkeleton from "@/components/custom/skeletons/EmployeeDashboardSkeleton";
 
 interface Todo {
     id: string;
@@ -40,51 +44,99 @@ interface User {
 }
 
 interface Event {
-
-    description: string | null
-    id: string
-    location: string | null
-    startTime: string
-    title: string
-
+    description: string | null;
+    id: string;
+    location: string | null;
+    startTime: string;
+    title: string;
 }
 
 export default function EmployeeDashboardPage() {
+    const router = useRouter();
+    const [loading, setLoading] = useState(true);
 
-    const router = useRouter()
-    const [loading, setLoading] = useState(true)
+    const [theUser, setTheUser] = useState<User | null>(null);
+    const [todos, setTodos] = useState<Todo[]>([]);
+    const [events, setEvents] = useState<Event[] | null>(null);
 
-    const [theUser, setTheUser] = useState<User | null>(null)
-    const [todos, setTodos] = useState<Todo[]>([])
-    const [events, setEvents] = useState<Event[] | null>(null)
+    const [calendarDate, setCalendarDate] = useState<Dayjs | null>(dayjs());
+    const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null);
+    const [showEventModal, setShowEventModal] = useState(false);
 
-    const [calendarDate, setCalendarDate] = useState<Dayjs | null>(dayjs())
-
-    const { user } = useSession()
-
+    const { user } = useSession();
 
     useEffect(() => {
-
         async function fetchDashboardData() {
-
             if (user) {
-
-                const res = await fetch(`http://localhost:5500/api/employee/dashboard?userId=${user.id}`)
-                const data = await res.json()
-                console.log(data)
-                setTheUser(data.user)
-                setTodos(data.todos)
-                setEvents(data.events)
-                setLoading(false)
-
+                const res = await fetch(
+                    `http://localhost:5500/api/employee/dashboard?userId=${user.id}`
+                );
+                const data = await res.json();
+                console.log(data);
+                setTheUser(data.user);
+                setTodos(data.todos);
+                setEvents(data.events);
+                setLoading(false);
             }
-
         }
 
-        fetchDashboardData()
+        fetchDashboardData();
+    }, [user]);
 
-    }, [user])
+    // Get events for a specific date
+    const getEventsForDate = (date: Dayjs) => {
+        if (!events) return [];
 
+        return events.filter((event) => {
+            const eventDate = dayjs(event.startTime);
+            return eventDate.isSame(date, "day");
+        });
+    };
+
+    // Custom day component with event dots
+    const CustomDay = (props: PickersDayProps) => {
+        const { day, outsideCurrentMonth, ...other } = props;
+        const eventsOnDay = getEventsForDate(day);
+        const hasEvents = eventsOnDay.length > 0 && !outsideCurrentMonth;
+
+        return (
+            <Badge
+                key={day.toString()}
+                overlap="circular"
+                badgeContent={
+                    hasEvents ? (
+                        <div className="w-2 h-2 bg-green-600 rounded-full z-0" />
+                    ) : undefined
+                }
+                sx={{
+                    "& .MuiBadge-badge": {
+                        right: "50%",
+                        top: 21,
+                        transform: "translateX(50%)",
+                        backgroundColor: "transparent",
+                    },
+                }}
+            >
+                <PickersDay
+                    {...other}
+                    outsideCurrentMonth={outsideCurrentMonth}
+                    day={day}
+                />
+            </Badge>
+        );
+    };
+
+    // Handle date selection
+    const handleDateChange = (date: Dayjs | null) => {
+        if (date) {
+            setCalendarDate(date);
+            const eventsOnDate = getEventsForDate(date);
+            if (eventsOnDate.length > 0) {
+                setSelectedDate(date);
+                setShowEventModal(true);
+            }
+        }
+    };
 
     const getPositionDisplay = () => {
         if (!theUser) return "";
@@ -93,7 +145,7 @@ export default function EmployeeDashboardPage() {
         } else {
             return formatPosition(theUser?.administrativePosition);
         }
-    }
+    };
 
     const formatPosition = (position: string | null | undefined) => {
         if (!position) return "";
@@ -101,15 +153,13 @@ export default function EmployeeDashboardPage() {
             .split("_")
             .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
             .join(" ");
-    }
+    };
 
     const formatEventDate = (iso: string) => {
         const date = new Date(iso);
 
         return {
-            month: date
-                .toLocaleString("en-US", { month: "short" })
-                .toUpperCase(),
+            month: date.toLocaleString("en-US", { month: "short" }).toUpperCase(),
             day: date.getDate(),
             time: date.toLocaleString("en-US", {
                 hour: "numeric",
@@ -121,9 +171,7 @@ export default function EmployeeDashboardPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            </div>
+            <EmployeeDashboardSkeleton />
         );
     }
 
@@ -143,8 +191,61 @@ export default function EmployeeDashboardPage() {
         day: "numeric",
     });
 
+    const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : [];
+
     return (
         <div className="w-full p-6">
+            {/* Event Modal */}
+            {showEventModal && selectedDate && (
+                <div className="fixed inset-0 bg-black/40 bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-xl font-bold text-gray-900">
+                                Events on {selectedDate.format("MMMM D, YYYY")}
+                            </h3>
+                            <button
+                                onClick={() => setShowEventModal(false)}
+                                className="text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                                <FaTimes size={20} />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4 max-h-96 overflow-y-auto">
+                            {selectedDateEvents.map((event) => (
+                                <div
+                                    key={event.id}
+                                    className="p-4 bg-blue-50 rounded-lg border border-blue-100"
+                                >
+                                    <h4 className="font-semibold text-gray-900 mb-2">
+                                        {event.title}
+                                    </h4>
+                                    {event.description && (
+                                        <p className="text-sm text-gray-600 mb-2">
+                                            {event.description}
+                                        </p>
+                                    )}
+                                    <div className="flex items-center gap-4 text-sm text-gray-500">
+                                        {event.location && (
+                                            <div className="flex items-center gap-1">
+                                                <FaMapMarkerAlt size={14} />
+                                                <span>{event.location}</span>
+                                            </div>
+                                        )}
+                                        <div className="flex items-center gap-1">
+                                            <FaCalendarAlt size={14} />
+                                            <span>
+                                                {formatEventDate(event.startTime).time}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <div className="mb-8">
                 <h1 className="text-3xl font-bold text-gray-900">
@@ -157,13 +258,9 @@ export default function EmployeeDashboardPage() {
 
             {/* Main Grid Layout */}
             <div className="w-full">
-
                 <div className="grid grid-cols-4 gap-6">
-
-                    {/* Profile Card */}
+                    {/* Profile Card - Keep your existing code */}
                     <div className="grid grid-cols-[300px_1fr] col-span-3 gap-6 bg-white rounded-2xl shadow-sm p-8">
-
-                        {/* Photo */}
                         <div className="relative h-80 rounded-2xl overflow-hidden bg-gradient-to-br from-blue-400 to-sky-300">
                             {theUser?.profilePictureUrl ? (
                                 <img
@@ -181,10 +278,7 @@ export default function EmployeeDashboardPage() {
                             )}
                         </div>
 
-                        {/* Profile Info */}
                         <div className="flex flex-col">
-
-                            {/* Name + Position */}
                             <div className="mb-6">
                                 <h2 className="text-3xl font-bold text-gray-900 mb-2">
                                     {theUser?.firstName} {theUser?.lastName}
@@ -194,7 +288,6 @@ export default function EmployeeDashboardPage() {
                                 </p>
                             </div>
 
-                            {/* Contact Info */}
                             <div className="space-y-3 mb-6 text-gray-700 text-base">
                                 {theUser?.email && (
                                     <div className="flex items-center gap-3">
@@ -204,19 +297,24 @@ export default function EmployeeDashboardPage() {
                                 )}
                                 {theUser?.city && (
                                     <div className="flex items-center gap-3">
-                                        <FaMapMarkerAlt size={20} className="text-blue-600 shrink-0" />
+                                        <FaMapMarkerAlt
+                                            size={20}
+                                            className="text-blue-600 shrink-0"
+                                        />
                                         <span>{theUser?.city}</span>
                                     </div>
                                 )}
                                 {theUser?.school && (
                                     <div className="flex items-center gap-3">
-                                        <FaUniversity size={20} className="text-blue-600 shrink-0" />
+                                        <FaUniversity
+                                            size={20}
+                                            className="text-blue-600 shrink-0"
+                                        />
                                         <span>{theUser?.school.schoolName}</span>
                                     </div>
                                 )}
                             </div>
 
-                            {/* Action Button */}
                             <button
                                 onClick={() => router.push("/employee/profile")}
                                 className="mt-auto w-full gap-2 py-4 text-base border border-gray-300 rounded-lg flex items-center justify-center text-gray-700 hover:bg-gray-50 transition-colors"
@@ -224,59 +322,52 @@ export default function EmployeeDashboardPage() {
                                 <FiUser size={20} />
                                 Edit profile
                             </button>
-
                         </div>
                     </div>
 
-                    {/* Upcoming Events Card */}
+                    {/* Upcoming Events Card - Keep your existing code */}
                     <div className="bg-white rounded-2xl shadow-sm px-10 py-6">
                         <h3 className="text-lg font-semibold text-gray-900 my-4">
                             Upcoming Events
                         </h3>
 
-                        {
-
-                            events && (
-
-                                events.map((event: Event) => (
-
-                                    <div className="space-y-4" key={event.id}>
-
-                                        <div className="flex gap-4">
-                                            <div className="flex flex-col items-center">
-                                                <span className="text-xs font-semibold text-blue-600">{formatEventDate(event.startTime).month}</span>
-                                                <span className="text-2xl font-bold text-gray-900">{formatEventDate(event.startTime).day}</span>
-                                            </div>
-                                            <div>
-                                                <h4 className="font-semibold text-gray-900">
-                                                    {event.title}
-                                                </h4>
-                                                <p className="text-sm mb-2 text-gray-500">{event.location} at {formatEventDate(event.startTime).time}</p>
-                                            </div>
+                        {events && (
+                            <div className="space-y-4">
+                                {events.map((event: Event) => (
+                                    <div className="flex gap-4" key={event.id}>
+                                        <div className="flex flex-col items-center">
+                                            <span className="text-xs font-semibold text-blue-600">
+                                                {formatEventDate(event.startTime).month}
+                                            </span>
+                                            <span className="text-2xl font-bold text-gray-900">
+                                                {formatEventDate(event.startTime).day}
+                                            </span>
                                         </div>
-
+                                        <div>
+                                            <h4 className="font-semibold text-gray-900">
+                                                {event.title}
+                                            </h4>
+                                            <p className="text-sm mb-2 text-gray-500">
+                                                {event.location} at{" "}
+                                                {formatEventDate(event.startTime).time}
+                                            </p>
+                                        </div>
                                     </div>
-
-                                ))
-
-                            )
-
-                        }
-
+                                ))}
+                            </div>
+                        )}
                     </div>
-
                 </div>
 
                 <div className="grid grid-cols-2 gap-5 mt-5">
-
-                    {/* Calendar Card */}
+                    {/* Calendar Card - UPDATED */}
                     <div className="bg-white rounded-2xl shadow-sm p-6">
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">
                                 <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                                    <FaCalendarAlt className="text-blue-600" size={24} /> {/* slightly bigger icon */}
+                                    <FaCalendarAlt className="text-blue-600" size={24} />
                                 </div>
-                                <h3 className="text-xl font-bold text-gray-900"> {/* bigger month/year */}
+                                <h3 className="text-xl font-bold text-gray-900">
                                     {calendarDate?.format("MMMM YYYY")}
                                 </h3>
                             </div>
@@ -286,13 +377,16 @@ export default function EmployeeDashboardPage() {
                             <LocalizationProvider dateAdapter={AdapterDayjs}>
                                 <DateCalendar
                                     value={calendarDate}
-                                    onChange={(newValue) => setCalendarDate(newValue)}
+                                    onChange={handleDateChange}
+                                    slots={{
+                                        day: CustomDay,
+                                    }}
                                     reduceAnimations
                                     sx={{
                                         width: "100%",
                                         maxWidth: 360,
                                         ".MuiPickersSlideTransition-root": {
-                                            minHeight: 240, // a bit taller for spacing
+                                            minHeight: 240,
                                         },
                                         ".MuiPickersCalendarHeader-root": {
                                             padding: "0 4px !important",
@@ -302,7 +396,7 @@ export default function EmployeeDashboardPage() {
                                             cursor: "pointer",
                                         },
                                         ".MuiPickersCalendarHeader-label": {
-                                            fontSize: "1rem !important",  // bigger month/year font
+                                            fontSize: "1rem !important",
                                             fontWeight: 700,
                                             "&:hover": {
                                                 backgroundColor: "rgba(0,0,0,0.04)",
@@ -314,13 +408,13 @@ export default function EmployeeDashboardPage() {
                                             minWidth: "32px",
                                             minHeight: "32px",
                                             "& svg": {
-                                                fontSize: "1.2rem", // bigger > / < icons
+                                                fontSize: "1.2rem",
                                             },
                                         },
                                         ".MuiDayCalendar-header span": {
                                             width: "36px",
                                             height: "24px",
-                                            fontSize: "0.8rem !important", // bigger weekday labels
+                                            fontSize: "0.8rem !important",
                                             fontWeight: 600,
                                             color: "#666",
                                             display: "flex",
@@ -334,6 +428,7 @@ export default function EmployeeDashboardPage() {
                                             minWidth: 40,
                                             minHeight: 40,
                                             padding: 0,
+                                            zIndex: 10,
                                         },
                                         ".Mui-selected": {
                                             minWidth: 40,
@@ -349,7 +444,7 @@ export default function EmployeeDashboardPage() {
                         </div>
                     </div>
 
-                    {/* To-Do List Card */}
+                    {/* To-Do List Card - Keep your existing code */}
                     <div className="bg-white rounded-2xl shadow-sm p-6">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-semibold text-gray-900">
@@ -358,7 +453,6 @@ export default function EmployeeDashboardPage() {
                         </div>
 
                         <div className="flex flex-col flex-1 h-full">
-                            {/* This div will take up all available space and scroll if needed */}
                             <div className="h-80 overflow-y-auto">
                                 <div className="space-y-3">
                                     {todos.length === 0 ? (
@@ -373,7 +467,10 @@ export default function EmployeeDashboardPage() {
                                             >
                                                 <div className="mt-1">
                                                     {todo.status === "Completed" ? (
-                                                        <FaCheckCircle className="text-green-500" size={18} />
+                                                        <FaCheckCircle
+                                                            className="text-green-500"
+                                                            size={18}
+                                                        />
                                                     ) : (
                                                         <div className="w-[18px] h-[18px] border-2 border-gray-300 rounded"></div>
                                                     )}
@@ -399,7 +496,6 @@ export default function EmployeeDashboardPage() {
                                 </div>
                             </div>
 
-                            {/* This button will stick to the bottom using mt-auto */}
                             <button
                                 onClick={() => router.push("/employee/todos")}
                                 className="w-full mt-4 py-2 text-gray-700 font-medium hover:bg-gray-50 rounded-lg transition-colors flex items-center justify-center gap-2"
@@ -408,12 +504,8 @@ export default function EmployeeDashboardPage() {
                                 <span>→</span>
                             </button>
                         </div>
-
                     </div>
-
-
                 </div>
-
             </div>
         </div>
     );

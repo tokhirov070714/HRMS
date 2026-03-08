@@ -9,7 +9,10 @@ const {
     getEmployeeProfile,
     getSchoolNames,
     getDepartmentNames,
-    getFreeDeans
+    getFreeDeans,
+    getEvents,
+    createEvent,
+    deleteEvent
 
 } = require("../controllers/adminController.js")
 
@@ -28,5 +31,9 @@ router.get("/schools/freedeans", getFreeDeans)
 
 router.get("/:schoolId/departments/names", getDepartmentNames)
 router.get("/schools/:schoolId", getDepartmentData)
+
+router.get("/events", getEvents)
+router.post("/events", createEvent)
+router.delete("/events/:id", deleteEvent)
 
 module.exports = router

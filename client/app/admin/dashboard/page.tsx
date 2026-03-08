@@ -3,11 +3,14 @@ import dayjs, { Dayjs } from 'dayjs';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
+import { PickersDay, PickersDayProps } from "@mui/x-date-pickers/PickersDay";
+import { Badge } from "@mui/material";
 import { useEffect, useState } from 'react';
 
 import { BiUser } from "react-icons/bi";
 import { RiBuildingFill } from "react-icons/ri";
 import { MdKeyboardArrowRight } from "react-icons/md";
+import { FaTimes, FaMapMarkerAlt, FaCalendarAlt } from "react-icons/fa";
 
 import {
     Table,
@@ -31,7 +34,6 @@ interface SchoolProps {
 }
 
 interface EmployeeProps {
-
     department?: { departmentName?: string },
     firstName: string,
     id: string,
@@ -41,13 +43,22 @@ interface EmployeeProps {
     profilePictureUrl: string | null,
     status: string
     isLocal: boolean
+}
 
+interface Event {
+    description: string | null;
+    id: string;
+    location: string | null;
+    startTime: string;
+    title: string;
 }
 
 
 export default function page() {
 
     const [calendarDate, setCalendarDate] = useState<Dayjs | null>(dayjs())
+    const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null);
+    const [showEventModal, setShowEventModal] = useState(false);
 
     const [isClient, setIsClient] = useState<boolean>(false)
 
@@ -62,15 +73,13 @@ export default function page() {
 
     const [internationalEmployees, setInternationalEmployees] = useState<EmployeeProps[] | null>(null)
 
+    const [events, setEvents] = useState<Event[] | null>(null)
+
     useEffect(() => {
 
         setIsClient(true)
 
-
         async function getDashboardData() {
-            // setLoadingDashboard(true)
-
-
             const res = await fetch("http://localhost:5500/api/admin/dashboard")
             const data = await res.json()
 
@@ -80,6 +89,7 @@ export default function page() {
             setInternationalEmployees(data.internationalEmployees)
             setLocalEmployees(data.localEmployees)
             setSchoolsCount(data.schoolsCount)
+            setEvents(data.events) // Set events data
 
             setLoadingDashboard(false)
         }
@@ -88,15 +98,135 @@ export default function page() {
 
     }, [])
 
+    // Get events for a specific date
+    const getEventsForDate = (date: Dayjs) => {
+        if (!events) return [];
+
+        return events.filter((event) => {
+            const eventDate = dayjs(event.startTime);
+            return eventDate.isSame(date, "day");
+        });
+    };
+
+    // Custom day component with event dots
+    const CustomDay = (props: PickersDayProps) => {
+        const { day, outsideCurrentMonth, ...other } = props;
+        const eventsOnDay = getEventsForDate(day);
+        const hasEvents = eventsOnDay.length > 0 && !outsideCurrentMonth;
+
+        return (
+            <Badge
+                key={day.toString()}
+                overlap="circular"
+                badgeContent={
+                    hasEvents ? (
+                        <div className="w-2 h-2 bg-green-600 rounded-full z-0" />
+                    ) : undefined
+                }
+                sx={{
+                    "& .MuiBadge-badge": {
+                        right: "50%",
+                        top: 16,
+                        transform: "translateX(50%)",
+                        backgroundColor: "transparent",
+                    },
+                }}
+            >
+                <PickersDay
+                    {...other}
+                    outsideCurrentMonth={outsideCurrentMonth}
+                    day={day}
+                />
+            </Badge>
+        );
+    };
+
+    // Handle date selection
+    const handleDateChange = (date: Dayjs | null) => {
+        if (date) {
+            setCalendarDate(date);
+            const eventsOnDate = getEventsForDate(date);
+            if (eventsOnDate.length > 0) {
+                setSelectedDate(date);
+                setShowEventModal(true);
+            }
+        }
+    };
+
+    const formatEventDate = (iso: string) => {
+        const date = new Date(iso);
+
+        return {
+            month: date.toLocaleString("en-US", { month: "short" }).toUpperCase(),
+            day: date.getDate(),
+            time: date.toLocaleString("en-US", {
+                hour: "numeric",
+                minute: "2-digit",
+                hour12: true,
+            }),
+        };
+    };
+
     if (loadingDashboard) {
-
         return <DashboardSkeleton />
-
     }
+
+    const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : [];
 
     return (
 
         <div className="w-full">
+
+            {/* Event Modal */}
+            {showEventModal && selectedDate && (
+                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-xl font-bold text-gray-900">
+                                Events on {selectedDate.format("MMMM D, YYYY")}
+                            </h3>
+                            <button
+                                onClick={() => setShowEventModal(false)}
+                                className="text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                                <FaTimes size={20} />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4 max-h-96 overflow-y-auto">
+                            {selectedDateEvents.map((event) => (
+                                <div
+                                    key={event.id}
+                                    className="p-4 bg-blue-50 rounded-lg border border-blue-100"
+                                >
+                                    <h4 className="font-semibold text-gray-900 mb-2">
+                                        {event.title}
+                                    </h4>
+                                    {event.description && (
+                                        <p className="text-sm text-gray-600 mb-2">
+                                            {event.description}
+                                        </p>
+                                    )}
+                                    <div className="flex items-center gap-4 text-sm text-gray-500">
+                                        {event.location && (
+                                            <div className="flex items-center gap-1">
+                                                <FaMapMarkerAlt size={14} />
+                                                <span>{event.location}</span>
+                                            </div>
+                                        )}
+                                        <div className="flex items-center gap-1">
+                                            <FaCalendarAlt size={14} />
+                                            <span>
+                                                {formatEventDate(event.startTime).time}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="max-w-350 mx-auto">
 
@@ -116,13 +246,9 @@ export default function page() {
                         {/* Total */}
                         <h1 className='text-4xl font-bold mt-4'>
                             {
-
                                 (internationalEmployees && localEmployees) ? (
-
                                     <span>{internationalEmployees.length + localEmployees.length}</span>
-
                                 ) : <span>0</span>
-
                             }
                         </h1>
 
@@ -136,11 +262,9 @@ export default function page() {
                                 <span className="text-gray-500">International</span>
 
                                 {
-
                                     internationalEmployees ?
                                         <span className="text-lg font-semibold text-blue-600">{internationalEmployees.length}</span> :
                                         <span className="text-lg font-semibold text-blue-600">0</span>
-
                                 }
 
                             </div>
@@ -149,11 +273,9 @@ export default function page() {
                                 <span className="text-gray-500">Local</span>
 
                                 {
-
                                     localEmployees ?
                                         <span className="text-lg font-semibold text-gray-800">{localEmployees.length}</span> :
                                         <span className="text-lg font-semibold text-gray-800">0</span>
-
                                 }
 
                             </div>
@@ -174,9 +296,7 @@ export default function page() {
                         </div>
 
                         <h1 className='text-4xl font-bold mt-4'>
-
                             {schoolsCount}
-
                         </h1>
 
                         <p className="text-sm text-gray-500 mt-2">
@@ -187,7 +307,6 @@ export default function page() {
 
 
                     {
-
                         !isClient ?
                             (
                                 <div className="rounded-xl border border-gray-300 bg-white shadow-sm">
@@ -197,14 +316,15 @@ export default function page() {
                                 </div>
                             ) :
                             <div>
-
                                 <div className="py-4 rounded-xl border border-gray-300 bg-white shadow-sm">
                                     <LocalizationProvider dateAdapter={AdapterDayjs}>
                                         <DateCalendar
                                             value={calendarDate}
-                                            onChange={(newValue) => setCalendarDate(newValue)}
+                                            onChange={handleDateChange}
+                                            slots={{
+                                                day: CustomDay,
+                                            }}
                                             reduceAnimations
-                                            // shouldDisableDate={() => true}
 
                                             sx={{
                                                 width: '260px',
@@ -274,6 +394,7 @@ export default function page() {
                                                     minWidth: '30px',
                                                     minHeight: '30px',
                                                     padding: '0',
+                                                    zIndex: 10,
                                                 },
 
                                                 // Selected date styling
@@ -289,10 +410,7 @@ export default function page() {
                                                     backgroundColor: 'transparent',
                                                 },
 
-                                                // =============================================
-                                                // FIXED YEAR VIEW - prevent zoom
-                                                // =============================================
-
+                                                // Year view
                                                 '& .MuiYearCalendar-root': {
                                                     width: '260px !important',
                                                     maxWidth: '260px !important',
@@ -311,10 +429,7 @@ export default function page() {
                                                     padding: '0 !important',
                                                 },
 
-                                                // =============================================
-                                                // FIXED MONTH VIEW - prevent zoom
-                                                // =============================================
-
+                                                // Month view
                                                 '& .MuiMonthCalendar-root': {
                                                     width: '260px !important',
                                                     maxWidth: '260px !important',
@@ -331,15 +446,12 @@ export default function page() {
                                                     margin: '2px !important',
                                                     padding: '0 !important',
                                                 },
-
                                             }}
                                         />
                                     </LocalizationProvider>
                                 </div>
-
                             </div>
                     }
-
 
                 </div>
 
@@ -348,31 +460,23 @@ export default function page() {
                     <div className='mt-10 border border-gray-300 bg-white shadow-sm flex flex-col rounded-xl'>
 
                         <div className='border-b border-gray-300 p-6'>
-
-                            <h1 className='text-xl font-bold'>Schools</h1>  {/* ← was Departments */}
-
+                            <h1 className='text-xl font-bold'>Schools</h1>
                         </div>
 
                         <div className='p-6 flex flex-col gap-3'>
 
                             {
-
                                 schools?.map((school: SchoolProps) => (
-
                                     <Link href={`/admin/schools/${school.id}`} className='p-3 flex items-center justify-between rounded-lg bg-[#2268eb] hover:bg-[#2b71f5] transition duration-100 cursor-pointer' key={school.id}>
 
                                         <div className='flex items-center gap-3 text-white'>
 
                                             <div className='w-10 h-10 p-1 bg-gray-200 flex items-center justify-center rounded-lg'>
-
                                                 {school.icon}
-
                                             </div>
 
                                             <div>
-
                                                 <h1 className='text-base font-bold'>{school.schoolName}</h1>
-
                                             </div>
 
                                         </div>
@@ -380,21 +484,17 @@ export default function page() {
                                         <MdKeyboardArrowRight size={22} color='white' />
 
                                     </Link>
-
                                 ))
-
                             }
 
                         </div>
 
                         <div className='px-6 pb-5 w-full'>
-
-                            <Link href={"/admin/schools"}>   {/* ← was /admin/departments */}
+                            <Link href={"/admin/schools"}>
                                 <Button className='w-full py-5 bg-[#135BEC] hover:bg-[#2768e9] text-base font-bold cursor-pointer'>
-                                    Manage Schools   {/* ← was Manage Departments */}
+                                    Manage Schools
                                 </Button>
                             </Link>
-
                         </div>
 
                     </div>
@@ -405,9 +505,7 @@ export default function page() {
                     <div className='mt-10 p-6 rounded-xl border border-gray-300 bg-white shadow-sm'>
 
                         <div className=''>
-
                             <h2 className="text-xl font-bold mb-4 px-1.5">Employees</h2>
-
                         </div>
 
                         <div>
@@ -424,7 +522,6 @@ export default function page() {
                                 <TableBody>
 
                                     {
-
                                         employees?.map((employee: EmployeeProps) => (
 
                                             <TableRow key={employee.id} className="h-16 relative group hover:bg-gray-50">
@@ -488,7 +585,6 @@ export default function page() {
                                             </TableRow>
 
                                         ))
-
                                     }
 
                                 </TableBody>

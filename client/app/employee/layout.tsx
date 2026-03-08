@@ -58,7 +58,7 @@ export default function RootLayout({
                     {open && (
 
                         <div className="flex flex-col leading-tight ml-2">
-                            <h1 className="text-sm font-bold">Admin</h1>
+                            <h1 className="text-sm font-bold">User</h1>
                             <p className="text-xs text-gray-500">Portal</p>
                         </div>
 
@@ -112,7 +112,7 @@ export default function RootLayout({
                 {open && (
                     <div className="sticky bottom-0 left-0 p-4 border-t text-sm text-gray-600">
                         Logged in as:<br />
-                        <span className="font-medium">username_placeholder</span>
+                        <span className="font-bold">{user?.username}</span>
                     </div>
                 )}
             </aside>
@@ -124,7 +124,7 @@ export default function RootLayout({
                 <header className="h-16 bg-white shadow-sm border-b flex items-center justify-between px-6">
 
                     <div>
-                        <h1 className="text-lg font-semibold">Admin Panel</h1>
+                        <h1 className="text-lg font-semibold">User panel</h1>
                     </div>
 
                     <div className="w-10 h-10 rounded-full bg-[#1b69fb] text-white flex items-center justify-center text-base font-semibold">

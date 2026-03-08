@@ -51,7 +51,19 @@ async function getDashboardData(req, res) {
             select: { id: true },
         })
 
-        res.status(200).json({ schools, schoolsCount, employees, localEmployees, internationalEmployees })
+        const events = await prisma.event.findMany({
+
+            select: {
+                description: true,
+                id: true,
+                location: true,
+                startTime: true,
+                title: true
+            },
+
+        })
+
+        res.status(200).json({ schools, schoolsCount, employees, localEmployees, internationalEmployees, events })
 
     } catch (e) {
         console.log("Error in admin api dashboard: ", e)
@@ -376,6 +388,91 @@ async function getFreeDeans(req, res) {
 
 }
 
+async function getEvents(req, res) {
+
+    try {
+
+        const events = await prisma.event.findMany({
+
+            select: {
+                description: true,
+                id: true,
+                location: true,
+                startTime: true,
+                title: true
+            },
+
+        })
+
+        res.status(200).json(events)
+
+    } catch (e) {
+
+        console.log("Error in getEvents ", e)
+
+    }
+
+}
+
+async function createEvent(req, res) {
+    try {
+        const { title, description, location, startTime } = req.body;
+
+        // Validation
+        if (!title || !startTime) {
+            return res.status(400).json({
+                error: 'Title and start time are required'
+            });
+        }
+
+        const event = await prisma.event.create({
+            data: {
+                title,
+                description: description || null,
+                location: location || null,
+                startTime: new Date(startTime),
+            },
+            select: {
+                description: true,
+                id: true,
+                location: true,
+                startTime: true,
+                title: true
+            }
+        });
+
+        res.status(201).json({
+            message: 'Event created successfully',
+            event
+        });
+    } catch (error) {
+        console.error('Error creating event:', error);
+        res.status(500).json({
+            error: 'Failed to create event'
+        });
+    }
+}
+
+// Delete an event
+async function deleteEvent(req, res) {
+    try {
+        const { id } = req.params;
+
+        await prisma.event.delete({
+            where: { id }
+        });
+
+        res.status(200).json({
+            message: 'Event deleted successfully'
+        });
+    } catch (error) {
+        console.error('Error deleting event:', error);
+        res.status(500).json({
+            error: 'Failed to delete event'
+        });
+    }
+}
+
 module.exports = {
     getDashboardData,
     getEmployeeData,
@@ -384,5 +481,8 @@ module.exports = {
     getEmployeeProfile,
     getSchoolNames,
     getDepartmentNames,
-    getFreeDeans
+    getFreeDeans,
+    getEvents,
+    createEvent,
+    deleteEvent
 }

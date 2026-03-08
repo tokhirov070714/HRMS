@@ -8,6 +8,8 @@ import {
     HiOutlineCog6Tooth
 } from "react-icons/hi2"
 import { FiUsers } from "react-icons/fi";
+import { BiCalendarEvent } from "react-icons/bi";
+
 
 import { MdOutlineAssignment } from "react-icons/md"
 import useSession from "@/hooks/useSession";
@@ -73,6 +75,7 @@ export default function RootLayout({
                         { label: "Dashboard", icon: HiOutlineHome },
                         { label: "Employees", icon: FiUsers },
                         { label: "Schools", icon: MdOutlineAssignment },
+                        { label: "Events", icon: BiCalendarEvent },
                         { label: "Settings", icon: HiOutlineCog6Tooth },
                     ].map(item => {
                         const Icon = item.icon
@@ -111,7 +114,7 @@ export default function RootLayout({
                 {open && (
                     <div className="sticky bottom-0 left-0 p-4 border-t text-sm text-gray-600">
                         Logged in as:<br />
-                        <span className="font-medium">username_placeholder</span>
+                        <span className="font-medium">{user?.username}</span>
                     </div>
                 )}
             </aside>
